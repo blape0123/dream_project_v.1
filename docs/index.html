@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="GPS 측정 위치의 최대 오차를 고려해 원형 영역의 내부·외부 여부를 판별하는 시뮬레이터"
+    />
+    <title>GPS 위치 오차 시뮬레이터</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f5f7fb;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 18px 56px;
+      }
+
+      main {
+        width: min(1120px, 100%);
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: clamp(1.6rem, 4vw, 2.2rem);
+      }
+
+      h2 {
+        margin-bottom: 16px;
+        font-size: 1.2rem;
+      }
+
+      .intro {
+        margin-bottom: 24px;
+        color: #526078;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.7fr);
+        gap: 20px;
+        align-items: start;
+      }
+
+      .panel {
+        min-width: 0;
+        padding: 22px;
+        border: 1px solid #e1e7f0;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 4px 16px rgb(23 32 51 / 4%);
+      }
+
+      .controls {
+        display: grid;
+        gap: 18px;
+      }
+
+      .control label,
+      .experiment label {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 7px;
+        font-weight: 600;
+      }
+
+      output,
+      .muted,
+      .hint {
+        color: #64748b;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: #2563eb;
+      }
+
+      .hint {
+        margin: 18px 0 0;
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+
+      .visualization {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(230px, 0.9fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .chart-wrap {
+        min-width: 0;
+      }
+
+      #chart {
+        display: block;
+        width: min(100%, 520px);
+        height: auto;
+        margin: 0 auto;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px 16px;
+        margin: 8px 0 0;
+        color: #526078;
+        font-size: 0.84rem;
+      }
+
+      .legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border: 1px solid currentColor;
+        border-radius: 50%;
+      }
+
+      .swatch.region {
+        color: #1d4ed8;
+        background: #3b82f633;
+      }
+
+      .swatch.error {
+        color: #d97706;
+        background: #f59e0b47;
+      }
+
+      .result-card {
+        padding: 15px;
+        border-radius: 10px;
+        line-height: 1.55;
+      }
+
+      .result-card.inside {
+        color: #166534;
+        background: #f0fdf4;
+      }
+
+      .result-card.outside {
+        color: #991b1b;
+        background: #fef2f2;
+      }
+
+      .result-card.uncertain {
+        color: #92400e;
+        background: #fffbeb;
+      }
+
+      .result-card strong {
+        display: block;
+        margin-top: 8px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin: 16px 0;
+      }
+
+      .metric {
+        padding: 12px;
+        border-radius: 9px;
+        background: #f5f7fb;
+      }
+
+      .metric span {
+        display: block;
+        color: #64748b;
+        font-size: 0.82rem;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 1.08rem;
+      }
+
+      .equation {
+        overflow-wrap: anywhere;
+        margin: 12px 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.87rem;
+        line-height: 1.6;
+      }
+
+      .experiments {
+        margin-top: 20px;
+      }
+
+      .experiment-inputs {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .experiment input {
+        width: 100%;
+        min-width: 0;
+        padding: 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font: inherit;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+        white-space: nowrap;
+      }
+
+      th,
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5eaf2;
+        text-align: left;
+      }
+
+      th {
+        color: #526078;
+        background: #f8fafc;
+      }
+
+      details {
+        margin-top: 20px;
+        line-height: 1.65;
+      }
+
+      details li + li {
+        margin-top: 6px;
+      }
+
+      @media (max-width: 800px) {
+        .layout,
+        .visualization {
+          grid-template-columns: 1fr;
+        }
+
+        .experiment-inputs {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 440px) {
+        body {
+          padding: 22px 12px 40px;
+        }
+
+        .panel {
+          padding: 17px;
+        }
+
+        .experiment-inputs {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>GPS 위치 측정 오차에 따른 공간 영역 판별</h1>
+      <p class="intro">
+        측정 위치와 최대 오차를 바탕으로 실제 위치가 원형 영역의 내부인지,
+        외부인지, 또는 확정할 수 없는지 살펴봅니다.
+      </p>
+
+      <div class="layout">
+        <section class="panel" aria-labelledby="settings-heading">
+          <h2 id="settings-heading">좌표와 영역 설정</h2>
+          <div class="controls">
+            <div class="control">
+              <label for="center-x">영역 중심의 X좌표 (a)<output id="center-x-value"></output></label>
+              <input id="center-x" type="range" min="-20" max="20" value="0" step="0.1" />
+            </div>
+            <div class="control">
+              <label for="center-y">영역 중심의 Y좌표 (b)<output id="center-y-value"></output></label>
+              <input id="center-y" type="range" min="-20" max="20" value="0" step="0.1" />
+            </div>
+            <div class="control">
+              <label for="radius">영역의 반지름 (r)<output id="radius-value"></output></label>
+              <input id="radius" type="range" min="0.1" max="20" value="5" step="0.1" />
+            </div>
+            <div class="control">
+              <label for="measured-x">측정 위치의 X좌표<output id="measured-x-value"></output></label>
+              <input id="measured-x" type="range" min="-20" max="20" value="3" step="0.1" />
+            </div>
+            <div class="control">
+              <label for="measured-y">측정 위치의 Y좌표<output id="measured-y-value"></output></label>
+              <input id="measured-y" type="range" min="-20" max="20" value="0" step="0.1" />
+            </div>
+            <div class="control">
+              <label for="max-error">최대 오차 (ε)<output id="max-error-value"></output></label>
+              <input
+                id="max-error"
+                type="range"
+                min="0"
+                max="20"
+                value="1"
+                step="0.1"
+                aria-describedby="error-help"
+              />
+            </div>
+          </div>
+          <p class="hint" id="error-help">
+            슬라이더를 움직이면 그래프와 판별 결과가 즉시 갱신됩니다. ε은
+            측정 위치와 실제 위치 사이 거리의 최대값으로 가정합니다.
+          </p>
+        </section>
+
+        <section class="panel" aria-labelledby="visualization-heading">
+          <h2 id="visualization-heading">좌표평면 시각화 및 판별 결과</h2>
+          <div class="visualization">
+            <div class="chart-wrap">
+              <svg
+                id="chart"
+                viewBox="0 0 500 500"
+                role="img"
+                aria-label="측정 위치와 최대 오차 범위 그래프"
+              ></svg>
+              <div class="legend" aria-label="그래프 범례">
+                <span><i class="swatch region"></i>대상 영역</span>
+                <span><i class="swatch error"></i>최대 오차 범위</span>
+                <span>× 영역 중심 C</span>
+                <span>● 측정 위치 P</span>
+              </div>
+            </div>
+            <div>
+              <div id="result-card" class="result-card uncertain" aria-live="polite">
+                <span id="result-message"></span>
+                <strong>최종 판별: <span id="result-label"></span></strong>
+              </div>
+              <div class="metrics">
+                <div class="metric">
+                  <span>중심과 측정 위치 사이 거리 d</span>
+                  <strong id="distance"></strong>
+                </div>
+                <div class="metric">
+                  <span>최대 오차 ε</span>
+                  <strong id="error-metric"></strong>
+                </div>
+              </div>
+              <p>실제 위치와 중심 사이 거리의 가능한 범위: <strong id="distance-range"></strong></p>
+              <p class="equation" id="inside-equation"></p>
+              <p class="equation" id="outside-equation"></p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel experiments" aria-labelledby="experiments-heading">
+        <h2 id="experiments-heading">오차 변화 실험</h2>
+        <p>좌표와 영역은 고정하고 오차 ε만 바꾸어 판별 결과를 비교합니다.</p>
+        <div class="experiment-inputs">
+          <div class="experiment">
+            <label for="experiment-a">실험 A: ε</label>
+            <input id="experiment-a" type="number" min="0" value="0.5" step="0.5" required />
+          </div>
+          <div class="experiment">
+            <label for="experiment-b">실험 B: ε</label>
+            <input id="experiment-b" type="number" min="0" value="1" step="0.5" required />
+          </div>
+          <div class="experiment">
+            <label for="experiment-c">실험 C: ε</label>
+            <input id="experiment-c" type="number" min="0" value="2" step="0.5" required />
+          </div>
+          <div class="experiment">
+            <label for="experiment-d">실험 D: ε</label>
+            <input id="experiment-d" type="number" min="0" value="3" step="0.5" required />
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">실험</th>
+                <th scope="col">최대 오차 ε</th>
+                <th scope="col">거리 d</th>
+                <th scope="col">오차 범위 반지름</th>
+                <th scope="col">가능한 중심 거리</th>
+                <th scope="col">판별 결과</th>
+              </tr>
+            </thead>
+            <tbody id="experiment-results"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <details class="panel">
+        <summary>수학적 판별 원리</summary>
+        <p>
+          영역의 중심을 C(a, b), 반지름을 r, 측정 위치를 P(x, y), 측정 오차의
+          최대값을 ε이라고 합니다. 원의 내부는 (x-a)² + (y-b)² ≤ r²로 나타냅니다.
+        </p>
+        <ul>
+          <li><strong>반드시 내부:</strong> d + ε ≤ r — 가능한 모든 실제 위치가 원 안에 있습니다.</li>
+          <li><strong>반드시 외부:</strong> d - ε &gt; r — 가능한 모든 실제 위치가 원 밖에 있습니다.</li>
+          <li><strong>판단 불확실:</strong> 위 두 조건 모두 성립하지 않습니다.</li>
+        </ul>
+        <p>
+          ε은 실제 위치와 측정 위치 사이 거리의 최대값이라는 가정입니다. 경계에서
+          d + ε = r이면 반드시 내부이며, d - ε = r이면 반드시 외부 조건의 엄격
+          부등호를 만족하지 않아 판단 불확실입니다.
+        </p>
+      </details>
+    </main>
+
+    <script>
+      const inputIds = ["center-x", "center-y", "radius", "measured-x", "measured-y", "max-error"];
+      const experimentIds = ["experiment-a", "experiment-b", "experiment-c", "experiment-d"];
+      const resultDetails = {
+        inside: {
+          label: "반드시 내부",
+          message: "측정 오차를 고려해도 실제 위치는 영역 내부에 존재합니다.",
+        },
+        outside: {
+          label: "반드시 외부",
+          message: "측정 오차를 고려해도 실제 위치는 영역 외부에 존재합니다.",
+        },
+        uncertain: {
+          label: "판단 불확실",
+          message: "측정 오차로 인해 실제 위치가 영역 내부인지 외부인지 확정할 수 없습니다.",
+        },
+      };
+
+      const numberFormat = new Intl.NumberFormat("ko-KR", {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+      });
+
+      function format(value) {
+        return numberFormat.format(value);
+      }
+
+      function readInputs() {
+        return Object.fromEntries(
+          inputIds.map((id) => [id, Number(document.getElementById(id).value)]),
+        );
+      }
+
+      function classify({ "center-x": centerX, "center-y": centerY, radius, "measured-x": measuredX, "measured-y": measuredY }, error) {
+        const distance = Math.hypot(measuredX - centerX, measuredY - centerY);
+        const definitelyInside = distance + error <= radius;
+        const definitelyOutside = distance - error > radius;
+        const result = definitelyInside ? "inside" : definitelyOutside ? "outside" : "uncertain";
+        return {
+          distance,
+          minDistance: Math.max(0, distance - error),
+          maxDistance: distance + error,
+          definitelyInside,
+          definitelyOutside,
+          result,
+        };
+      }
+
+      function drawChart(values) {
+        const { "center-x": centerX, "center-y": centerY, radius, "measured-x": measuredX, "measured-y": measuredY, "max-error": error } = values;
+        const plot = { x: 54, y: 30, size: 392 };
+        const xValues = [centerX - radius, centerX + radius, measuredX - error, measuredX + error];
+        const yValues = [centerY - radius, centerY + radius, measuredY - error, measuredY + error];
+        const span = Math.max(Math.max(...xValues) - Math.min(...xValues), Math.max(...yValues) - Math.min(...yValues), 1);
+        const padding = span * 0.12;
+        const minX = Math.min(...xValues) - padding;
+        const maxX = Math.max(...xValues) + padding;
+        const minY = Math.min(...yValues) - padding;
+        const maxY = Math.max(...yValues) + padding;
+        const scale = plot.size / (maxX - minX);
+        const x = (value) => plot.x + (value - minX) * scale;
+        const y = (value) => plot.y + (maxY - value) * scale;
+        const ticks = Array.from({ length: 5 }, (_, index) => index / 4);
+        const grid = ticks
+          .map((tick) => {
+            const gx = plot.x + plot.size * tick;
+            const gy = plot.y + plot.size * tick;
+            const xv = minX + (maxX - minX) * tick;
+            const yv = maxY - (maxY - minY) * tick;
+            return `
+              <line x1="${gx}" y1="${plot.y}" x2="${gx}" y2="${plot.y + plot.size}" stroke="#e5eaf2"/>
+              <line x1="${plot.x}" y1="${gy}" x2="${plot.x + plot.size}" y2="${gy}" stroke="#e5eaf2"/>
+              <text x="${gx}" y="${plot.y + plot.size + 19}" text-anchor="middle" fill="#64748b" font-size="11">${format(xv)}</text>
+              <text x="${plot.x - 8}" y="${gy + 4}" text-anchor="end" fill="#64748b" font-size="11">${format(yv)}</text>`;
+          })
+          .join("");
+        const cx = x(centerX);
+        const cy = y(centerY);
+        const px = x(measuredX);
+        const py = y(measuredY);
+        const chart = document.getElementById("chart");
+        chart.setAttribute(
+          "aria-label",
+          `중심 (${format(centerX)}, ${format(centerY)}), 반지름 ${format(radius)}, 측정 위치 (${format(measuredX)}, ${format(measuredY)}), 최대 오차 ${format(error)}`,
+        );
+        chart.innerHTML = `
+          <title>측정 위치와 최대 오차 범위</title>
+          <desc>파란 원은 대상 영역, 주황색 원은 측정 위치 주변의 최대 오차 범위입니다.</desc>
+          <defs><clipPath id="plot-clip"><rect x="${plot.x}" y="${plot.y}" width="${plot.size}" height="${plot.size}"/></clipPath></defs>
+          ${grid}
+          <g clip-path="url(#plot-clip)">
+            <circle cx="${cx}" cy="${cy}" r="${radius * scale}" fill="#3b82f6" fill-opacity="0.2" stroke="#1d4ed8" stroke-width="2"/>
+            <circle cx="${px}" cy="${py}" r="${error * scale}" fill="#f59e0b" fill-opacity="0.28" stroke="#d97706" stroke-width="2"/>
+            <line x1="${cx}" y1="${cy}" x2="${px}" y2="${py}" stroke="#475569" stroke-width="1.5" stroke-dasharray="6 5"/>
+            <path d="M ${cx - 6} ${cy - 6} L ${cx + 6} ${cy + 6} M ${cx + 6} ${cy - 6} L ${cx - 6} ${cy + 6}" stroke="#1d4ed8" stroke-width="2.5"/>
+            <circle cx="${px}" cy="${py}" r="6" fill="#dc2626" stroke="white" stroke-width="1.5"/>
+          </g>
+          <rect x="${plot.x}" y="${plot.y}" width="${plot.size}" height="${plot.size}" fill="none" stroke="#94a3b8"/>
+          <text x="${plot.x + plot.size / 2}" y="490" text-anchor="middle" fill="#334155" font-size="13">X</text>
+          <text x="15" y="${plot.y + plot.size / 2}" text-anchor="middle" fill="#334155" font-size="13" transform="rotate(-90 15 ${plot.y + plot.size / 2})">Y</text>`;
+      }
+
+      function updateResults(values) {
+        const error = values["max-error"];
+        const analysis = classify(values, error);
+        const details = resultDetails[analysis.result];
+        const resultCard = document.getElementById("result-card");
+        resultCard.className = `result-card ${analysis.result}`;
+        document.getElementById("result-message").textContent = details.message;
+        document.getElementById("result-label").textContent = details.label;
+        document.getElementById("distance").textContent = format(analysis.distance);
+        document.getElementById("error-metric").textContent = format(error);
+        document.getElementById("distance-range").textContent =
+          `[${format(analysis.minDistance)}, ${format(analysis.maxDistance)}]`;
+        document.getElementById("inside-equation").textContent =
+          `d + ε = ${format(analysis.distance)} + ${format(error)} = ${format(analysis.distance + error)} ${analysis.definitelyInside ? "≤" : ">"} r=${format(values.radius)}`;
+        document.getElementById("outside-equation").textContent =
+          `d - ε = ${format(analysis.distance)} - ${format(error)} = ${format(analysis.distance - error)} ${analysis.definitelyOutside ? ">" : "≤"} r=${format(values.radius)}`;
+      }
+
+      function updateExperiments(values) {
+        const rows = experimentIds
+          .map((id, index) => {
+            const input = document.getElementById(id);
+            const error = Number(input.value);
+            if (input.value === "" || !Number.isFinite(error) || error < 0) {
+              return `<tr>
+                <th scope="row">실험 ${String.fromCharCode(65 + index)}</th>
+                <td colspan="5">최대 오차 ε에 0 이상의 숫자를 입력하세요.</td>
+              </tr>`;
+            }
+            const analysis = classify(values, error);
+            const result = resultDetails[analysis.result].label;
+            return `<tr>
+              <th scope="row">실험 ${String.fromCharCode(65 + index)}</th>
+              <td>${format(error)}</td>
+              <td>${format(analysis.distance)}</td>
+              <td>${format(error)}</td>
+              <td>[${format(analysis.minDistance)}, ${format(analysis.maxDistance)}]</td>
+              <td>${result}</td>
+            </tr>`;
+          })
+          .join("");
+        document.getElementById("experiment-results").innerHTML = rows;
+      }
+
+      function render() {
+        const values = readInputs();
+        inputIds.forEach((id) => {
+          document.getElementById(`${id}-value`).textContent = format(values[id]);
+        });
+        drawChart(values);
+        updateResults(values);
+        updateExperiments(values);
+      }
+
+      inputIds.forEach((id) => document.getElementById(id).addEventListener("input", render));
+      experimentIds.forEach((id) => document.getElementById(id).addEventListener("input", render));
+      render();
+    </script>
+  </body>
+</html>

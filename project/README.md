@@ -27,6 +27,15 @@ python app.py
 streamlit run app.py
 ```
 
+## GitHub Pages에 배포하기
+
+브라우저에서 바로 실행할 수 있도록 정적 버전이 [`docs/index.html`](../docs/index.html)에 있습니다.
+이 버전은 Python 서버나 별도 빌드 과정 없이 작동하며, 기존 `app.py` Streamlit 버전도 로컬 실행에 사용할 수 있습니다.
+
+1. 저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 설정합니다.
+2. `main` 브랜치에 변경 사항을 푸시하거나 Actions 탭에서 **Deploy static site to GitHub Pages**를 수동 실행합니다.
+3. Actions 실행이 성공하면 [GitHub Pages 사이트](https://blape0123.github.io/dream_project_v.1/)에서 앱을 사용할 수 있습니다.
+
 ## 사용 방법
 
 좌측 패널의 슬라이더에서 원의 중심 좌표, 반지름, 측정 좌표와 최대 오차 ε을 조절합니다.
